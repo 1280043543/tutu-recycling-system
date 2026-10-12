@@ -1,0 +1,940 @@
+openapi: 3.0.3
+info:
+  title: 社区废旧家电一体化管理系统 API
+  version: 1.0.0
+  description: 社区废旧家电预约、审核、分派、回收登记和居民确认接口。设计草案，服务端须校验角色、资源归属及订单状态。
+servers:
+  - url: http://localhost:8080
+    description: 本地开发环境示例地址
+security:
+  - bearerAuth: []
+tags:
+  - { name: 账号认证 }
+  - { name: 当前用户 }
+  - { name: 居民地址 }
+  - { name: 回收品类 }
+  - { name: 居民订单 }
+  - { name: 管理员订单 }
+  - { name: 回收人员任务 }
+  - { name: 管理员用户 }
+  - { name: 管理员统计 }
+paths:
+  /api/auth/register:
+    post:
+      tags: [账号认证]
+      summary: 居民注册（无需手机验证码）
+      operationId: registerResident
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201': { description: 注册成功, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/auth/login:
+    post:
+      tags: [账号认证]
+      summary: 用户登录
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200': { description: 登录成功, content: { application/json: { schema: { $ref: '#/components/schemas/LoginResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/auth/logout:
+    post:
+      tags: [账号认证]
+      summary: 用户退出
+      operationId: logout
+      responses:
+        '200': { description: 退出成功, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+  /api/users/me:
+    get:
+      tags: [当前用户]
+      summary: 查询当前用户资料
+      operationId: getCurrentUser
+      responses:
+        '200': { description: 用户资料, content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/ApiResponse' }, { type: object, properties: { data: { $ref: '#/components/schemas/User' } } }] } } } }
+    put:
+      tags: [当前用户]
+      summary: 修改当前用户资料
+      operationId: updateCurrentUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateProfileRequest' }
+      responses:
+        '200': { description: 修改成功, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /api/users/me/password:
+    put:
+      tags: [当前用户]
+      summary: 修改当前用户密码
+      operationId: changeCurrentPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangePasswordRequest' }
+      responses:
+        '200': { description: 修改成功, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /api/addresses:
+    get:
+      tags: [居民地址]
+      summary: 查询本人地址列表
+      operationId: listAddresses
+      responses:
+        '200': { description: 地址列表, content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/ApiResponse' }, { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Address' } } } }] } } } }
+    post:
+      tags: [居民地址]
+      summary: 新增回收地址
+      operationId: createAddress
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddressRequest' }
+      responses:
+        '201': { description: 创建成功, content: { application/json: { schema: { $ref: '#/components/schemas/Address' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /api/addresses/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    get:
+      tags: [居民地址]
+      summary: 查询地址详情
+      operationId: getAddress
+      responses:
+        '200': { description: 地址详情, content: { application/json: { schema: { $ref: '#/components/schemas/Address' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [居民地址]
+      summary: 修改回收地址
+      operationId: updateAddress
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddressRequest' }
+      responses:
+        '200': { description: 修改成功, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [居民地址]
+      summary: 删除回收地址（逻辑删除）
+      operationId: deleteAddress
+      responses:
+        '200': { description: 删除成功, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/addresses/{id}/default:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    put:
+      tags: [居民地址]
+      summary: 设置默认地址
+      operationId: setDefaultAddress
+      responses:
+        '200': { description: 设置成功, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+  /api/categories:
+    get:
+      tags: [回收品类]
+      summary: 查询启用中的回收品类
+      operationId: listEnabledCategories
+      responses:
+        '200': { description: 品类列表, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Category' } } } } }
+  /api/categories/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    get:
+      tags: [回收品类]
+      summary: 查询品类详情
+      operationId: getCategory
+      responses:
+        '200': { description: 品类详情, content: { application/json: { schema: { $ref: '#/components/schemas/Category' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/admin/categories:
+    get:
+      tags: [回收品类]
+      summary: 管理员分页查询全部品类
+      operationId: adminListCategories
+      parameters:
+        - $ref: '#/components/parameters/PageNum'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200': { description: 品类分页数据, content: { application/json: { schema: { $ref: '#/components/schemas/PageCategory' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [回收品类]
+      summary: 新增回收品类
+      operationId: createCategory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryRequest' }
+      responses:
+        '201': { description: 创建成功, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+  /api/admin/categories/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    put:
+      tags: [回收品类]
+      summary: 修改回收品类
+      operationId: updateCategory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryRequest' }
+      responses:
+        '200': { description: 修改成功, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+  /api/admin/categories/{id}/status:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    patch:
+      tags: [回收品类]
+      summary: 启用或停用品类
+      operationId: setCategoryStatus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: integer, enum: [0, 1], description: '1启用，0停用' }
+      responses:
+        '200': { description: 状态更新成功, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+  /api/orders:
+    post:
+      tags: [居民订单]
+      summary: 提交回收申请
+      operationId: createOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateOrderRequest' }
+      responses:
+        '201': { description: 创建成功，初始状态为待审核, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /api/orders/mine:
+    get:
+      tags: [居民订单]
+      summary: 分页查询本人订单
+      operationId: listMyOrders
+      parameters:
+        - $ref: '#/components/parameters/PageNum'
+        - $ref: '#/components/parameters/PageSize'
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/OrderStatus' }
+      responses:
+        '200': { description: 订单分页数据, content: { application/json: { schema: { $ref: '#/components/schemas/PageOrder' } } } }
+  /api/orders/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    get:
+      tags: [居民订单]
+      summary: 查询订单详情
+      operationId: getOrder
+      responses:
+        '200': { description: 订单详情, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/orders/{id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    post:
+      tags: [居民订单]
+      summary: 取消本人符合条件的订单
+      description: 仅待审核和待分派状态允许居民自行取消；已分派后需联系管理员处理。
+      operationId: cancelOrder
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, maxLength: 500, description: 取消原因，可选 }
+      responses:
+        '200': { description: 取消成功, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+        '409': { $ref: '#/components/responses/InvalidState' }
+  /api/orders/{id}/confirm-result:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    post:
+      tags: [居民订单]
+      summary: 确认回收结果
+      operationId: confirmRecycleResult
+      responses:
+        '200': { description: 确认成功，订单变为已完成, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+        '409': { $ref: '#/components/responses/InvalidState' }
+  /api/orders/{id}/raise-objection:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    post:
+      tags: [居民订单]
+      summary: 对回收结果提出异议
+      operationId: raiseOrderObjection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 1, maxLength: 500, description: 异议说明 }
+      responses:
+        '200': { description: 异议已提交, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+        '409': { $ref: '#/components/responses/InvalidState' }
+  /api/orders/{id}/review:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    post:
+      tags: [居民订单]
+      summary: 评价已完成订单
+      operationId: reviewOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReviewRequest' }
+      responses:
+        '201': { description: 评价成功, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+        '409': { $ref: '#/components/responses/InvalidState' }
+  /api/admin/orders:
+    get:
+      tags: [管理员订单]
+      summary: 管理员分页查询订单
+      operationId: adminListOrders
+      parameters:
+        - $ref: '#/components/parameters/PageNum'
+        - $ref: '#/components/parameters/PageSize'
+        - { name: orderNo, in: query, schema: { type: string } }
+        - { name: residentId, in: query, schema: { type: integer, format: int64 } }
+        - { name: workerId, in: query, schema: { type: integer, format: int64 } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/OrderStatus' } }
+        - { name: startTime, in: query, schema: { type: string, format: date-time } }
+        - { name: endTime, in: query, schema: { type: string, format: date-time } }
+      responses:
+        '200': { description: 订单分页数据, content: { application/json: { schema: { $ref: '#/components/schemas/PageOrder' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/admin/orders/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    get:
+      tags: [管理员订单]
+      summary: 管理员查询订单详情及操作记录
+      operationId: adminGetOrder
+      responses:
+        '200': { description: 订单详情, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/admin/orders/{id}/approve:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    post:
+      tags: [管理员订单]
+      summary: 审核通过订单
+      operationId: approveOrder
+      responses:
+        '200': { description: 进入待分派, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+        '409': { $ref: '#/components/responses/InvalidState' }
+  /api/admin/orders/{id}/reject:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    post:
+      tags: [管理员订单]
+      summary: 驳回回收申请
+      operationId: rejectOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 1, maxLength: 500 }
+      responses:
+        '200': { description: 驳回成功, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+        '409': { $ref: '#/components/responses/InvalidState' }
+  /api/admin/orders/{id}/assign:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    post:
+      tags: [管理员订单]
+      summary: 分派回收人员
+      operationId: assignOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssignmentRequest' }
+      responses:
+        '200': { description: 分派成功，进入待接单, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+        '409': { $ref: '#/components/responses/InvalidState' }
+  /api/admin/orders/{id}/reassign:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    post:
+      tags: [管理员订单]
+      summary: 重新分派回收人员
+      operationId: reassignOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssignmentRequest' }
+      responses:
+        '200': { description: 重新分派成功, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+        '409': { $ref: '#/components/responses/InvalidState' }
+  /api/admin/orders/{id}/handle-cancellation:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    post:
+      tags: [管理员订单]
+      summary: 处理已分派订单的取消请求
+      operationId: handleCancellationRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [approved, comment]
+              properties:
+                approved: { type: boolean, description: 是否同意取消 }
+                comment: { type: string, maxLength: 500 }
+      responses:
+        '200': { description: 处理完成, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+        '409': { $ref: '#/components/responses/InvalidState' }
+  /api/admin/orders/{id}/handle-exception:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    post:
+      tags: [管理员订单]
+      summary: 处理订单异常
+      operationId: handleOrderException
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [resolution]
+              properties:
+                resolution: { type: string, minLength: 1, maxLength: 500 }
+      responses:
+        '200': { description: 异常处理完成, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+        '409': { $ref: '#/components/responses/InvalidState' }
+  /api/worker/tasks:
+    get:
+      tags: [回收人员任务]
+      summary: 查询本人回收任务
+      operationId: listWorkerTasks
+      parameters:
+        - $ref: '#/components/parameters/PageNum'
+        - $ref: '#/components/parameters/PageSize'
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/OrderStatus' } }
+      responses:
+        '200': { description: 任务分页数据, content: { application/json: { schema: { $ref: '#/components/schemas/PageOrder' } } } }
+  /api/worker/tasks/{orderId}:
+    parameters:
+      - name: orderId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    get:
+      tags: [回收人员任务]
+      summary: 查询本人任务详情
+      operationId: getWorkerTask
+      responses:
+        '200': { description: 任务详情, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/worker/tasks/{orderId}/accept:
+    parameters:
+      - { name: orderId, in: path, required: true, schema: { type: integer, format: int64 } }
+    post:
+      tags: [回收人员任务]
+      summary: 确认接单
+      operationId: acceptTask
+      responses:
+        '200': { description: 接单成功, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+        '409': { $ref: '#/components/responses/InvalidState' }
+  /api/worker/tasks/{orderId}/reject:
+    parameters:
+      - { name: orderId, in: path, required: true, schema: { type: integer, format: int64 } }
+    post:
+      tags: [回收人员任务]
+      summary: 拒绝接单
+      operationId: rejectTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 1, maxLength: 500 }
+      responses:
+        '200': { description: 拒绝成功，进入待重新分派, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+        '409': { $ref: '#/components/responses/InvalidState' }
+  /api/worker/tasks/{orderId}/start:
+    parameters:
+      - { name: orderId, in: path, required: true, schema: { type: integer, format: int64 } }
+    post:
+      tags: [回收人员任务]
+      summary: 开始回收
+      operationId: startTask
+      responses:
+        '200': { description: 订单进入回收中, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+        '409': { $ref: '#/components/responses/InvalidState' }
+  /api/worker/tasks/{orderId}/result:
+    parameters:
+      - { name: orderId, in: path, required: true, schema: { type: integer, format: int64 } }
+    post:
+      tags: [回收人员任务]
+      summary: 登记实际回收结果
+      description: 按品类登记实际数量和重量，不登记回收金额；成功后等待居民确认。
+      operationId: recordRecycleResult
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecycleResultRequest' }
+      responses:
+        '200': { description: 结果登记成功, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/InvalidState' }
+  /api/worker/tasks/{orderId}/exception:
+    parameters:
+      - { name: orderId, in: path, required: true, schema: { type: integer, format: int64 } }
+    post:
+      tags: [回收人员任务]
+      summary: 提交执行异常
+      operationId: submitTaskException
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 1, maxLength: 500 }
+      responses:
+        '200': { description: 异常已提交, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+  /api/admin/users:
+    get:
+      tags: [管理员用户]
+      summary: 分页查询用户
+      operationId: adminListUsers
+      parameters:
+        - $ref: '#/components/parameters/PageNum'
+        - $ref: '#/components/parameters/PageSize'
+        - { name: role, in: query, schema: { type: string, enum: [RESIDENT, WORKER, ADMIN] } }
+        - { name: keyword, in: query, description: 匹配账号、姓名或电话, schema: { type: string } }
+        - { name: status, in: query, schema: { type: integer, enum: [0, 1] } }
+      responses:
+        '200': { description: 用户分页数据, content: { application/json: { schema: { $ref: '#/components/schemas/PageUser' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/admin/workers:
+    post:
+      tags: [管理员用户]
+      summary: 创建回收人员账号
+      operationId: createWorker
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateWorkerRequest' }
+      responses:
+        '201': { description: 回收人员创建成功, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/admin/users/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    get:
+      tags: [管理员用户]
+      summary: 查询用户资料
+      operationId: adminGetUser
+      responses:
+        '200': { description: 用户资料, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/admin/users/{id}/status:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    patch:
+      tags: [管理员用户]
+      summary: 启用或停用用户账号
+      operationId: setUserStatus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: integer, enum: [0, 1], description: '1启用，0停用' }
+      responses:
+        '200': { description: 状态更新成功, content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } } }
+  /api/admin/statistics/overview:
+    get:
+      tags: [管理员统计]
+      summary: 查询订单总量和状态分布
+      operationId: getStatisticsOverview
+      parameters:
+        - $ref: '#/components/parameters/StartTime'
+        - $ref: '#/components/parameters/EndTime'
+      responses:
+        '200': { description: 统计汇总, content: { application/json: { schema: { $ref: '#/components/schemas/StatisticsOverviewResponse' } } } }
+  /api/admin/statistics/categories:
+    get:
+      tags: [管理员统计]
+      summary: 按品类统计实际回收数量
+      operationId: getCategoryStatistics
+      parameters:
+        - $ref: '#/components/parameters/StartTime'
+        - $ref: '#/components/parameters/EndTime'
+      responses:
+        '200': { description: 品类统计, content: { application/json: { schema: { $ref: '#/components/schemas/CategoryStatisticsResponse' } } } }
+  /api/admin/statistics/weight:
+    get:
+      tags: [管理员统计]
+      summary: 查询实际回收重量
+      operationId: getWeightStatistics
+      parameters:
+        - $ref: '#/components/parameters/StartTime'
+        - $ref: '#/components/parameters/EndTime'
+      responses:
+        '200': { description: 重量统计，不包含金额, content: { application/json: { schema: { $ref: '#/components/schemas/WeightStatisticsResponse' } } } }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 示例采用 Bearer Token；若实现采用其他认证方式，应同步修改此定义。
+  parameters:
+    IdPath:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    PageNum:
+      name: pageNum
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+    StartTime:
+      name: startTime
+      in: query
+      schema: { type: string, format: date-time }
+    EndTime:
+      name: endTime
+      in: query
+      schema: { type: string, format: date-time }
+  schemas:
+    ApiResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: integer, example: 200 }
+        message: { type: string, example: 操作成功 }
+        data: { nullable: true, description: 业务数据 }
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: integer, example: 400 }
+        message: { type: string, example: 请求参数不正确 }
+        data: { nullable: true }
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, maxLength: 50 }
+        password: { type: string, format: password }
+    RegisterRequest:
+      type: object
+      required: [username, password, realName]
+      properties:
+        username: { type: string, maxLength: 50 }
+        password: { type: string, format: password, minLength: 8 }
+        realName: { type: string, maxLength: 50 }
+        phone: { type: string, maxLength: 20 }
+    LoginResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                accessToken: { type: string }
+                tokenType: { type: string, example: Bearer }
+                expiresIn: { type: integer, description: 令牌有效秒数 }
+                user: { $ref: '#/components/schemas/User' }
+    User:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        username: { type: string }
+        realName: { type: string }
+        phone: { type: string, nullable: true }
+        role: { type: string, enum: [RESIDENT, WORKER, ADMIN] }
+        status: { type: integer, enum: [0, 1] }
+    UpdateProfileRequest:
+      type: object
+      properties:
+        realName: { type: string, maxLength: 50 }
+        phone: { type: string, maxLength: 20 }
+    ChangePasswordRequest:
+      type: object
+      required: [oldPassword, newPassword]
+      properties:
+        oldPassword: { type: string, format: password }
+        newPassword: { type: string, format: password, minLength: 8 }
+    AddressRequest:
+      type: object
+      required: [contactName, contactPhone, region, detailAddress]
+      properties:
+        contactName: { type: string, maxLength: 50 }
+        contactPhone: { type: string, maxLength: 20 }
+        region: { type: string, maxLength: 150 }
+        detailAddress: { type: string, maxLength: 255 }
+        addressRemark: { type: string, maxLength: 255, nullable: true }
+        isDefault: { type: boolean, default: false }
+    Address:
+      allOf:
+        - $ref: '#/components/schemas/AddressRequest'
+        - type: object
+          properties:
+            id: { type: integer, format: int64 }
+    CategoryRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 100 }
+        description: { type: string, maxLength: 500, nullable: true }
+        recycleRequirements: { type: string, maxLength: 500, nullable: true }
+        status: { type: integer, enum: [0, 1], default: 1 }
+    Category:
+      allOf:
+        - $ref: '#/components/schemas/CategoryRequest'
+        - type: object
+          properties:
+            id: { type: integer, format: int64 }
+    OrderStatus:
+      type: string
+      enum: [PENDING_REVIEW, PENDING_ASSIGNMENT, PENDING_ACCEPTANCE, ACCEPTED, IN_PROGRESS, PENDING_RESIDENT_CONFIRMATION, COMPLETED, REJECTED, CANCELLED, PENDING_REASSIGNMENT, EXCEPTION_PENDING]
+    CreateOrderItemRequest:
+      type: object
+      required: [categoryId, estimatedQuantity]
+      properties:
+        categoryId: { type: integer, format: int64 }
+        estimatedQuantity: { type: integer, minimum: 1 }
+        itemDescription: { type: string, maxLength: 500, nullable: true }
+    CreateOrderRequest:
+      type: object
+      required: [addressId, appointmentTime, items]
+      properties:
+        addressId: { type: integer, format: int64 }
+        appointmentTime: { type: string, format: date-time }
+        description: { type: string, maxLength: 1000, nullable: true }
+        items:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/CreateOrderItemRequest' }
+    OrderItem:
+      type: object
+      properties:
+        categoryId: { type: integer, format: int64 }
+        categoryName: { type: string }
+        estimatedQuantity: { type: integer }
+        actualQuantity: { type: integer, nullable: true }
+        actualWeight: { type: number, format: double, nullable: true }
+        weightUnit: { type: string, nullable: true }
+    Order:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        orderNo: { type: string }
+        residentId: { type: integer, format: int64 }
+        workerId: { type: integer, format: int64, nullable: true }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        appointmentTime: { type: string, format: date-time }
+        contactName: { type: string }
+        contactPhone: { type: string }
+        region: { type: string }
+        detailAddress: { type: string }
+        addressRemark: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        items: { type: array, items: { $ref: '#/components/schemas/OrderItem' } }
+        logs: { type: array, items: { $ref: '#/components/schemas/OrderLog' } }
+        createdAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time, nullable: true }
+    OrderLog:
+      type: object
+      properties:
+        action: { type: string }
+        operatorId: { type: integer, format: int64, nullable: true }
+        fromStatus: { type: string, nullable: true }
+        toStatus: { type: string, nullable: true }
+        comment: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+    AssignmentRequest:
+      type: object
+      required: [workerId]
+      properties:
+        workerId: { type: integer, format: int64 }
+        comment: { type: string, maxLength: 500, nullable: true }
+    RecycleResultItemRequest:
+      type: object
+      required: [categoryId, actualQuantity, actualWeight]
+      properties:
+        categoryId: { type: integer, format: int64 }
+        actualQuantity: { type: integer, minimum: 0 }
+        actualWeight: { type: number, format: double, minimum: 0 }
+        weightUnit: { type: string, maxLength: 10, default: kg }
+    RecycleResultRequest:
+      type: object
+      required: [items]
+      properties:
+        remark: { type: string, maxLength: 500, nullable: true }
+        items:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/RecycleResultItemRequest' }
+    ReviewRequest:
+      type: object
+      required: [rating]
+      properties:
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        content: { type: string, maxLength: 1000, nullable: true }
+    PageOrder:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                records: { type: array, items: { $ref: '#/components/schemas/Order' } }
+                total: { type: integer, format: int64 }
+                pageNum: { type: integer }
+                pageSize: { type: integer }
+    PageUser:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                records: { type: array, items: { $ref: '#/components/schemas/User' } }
+                total: { type: integer, format: int64 }
+                pageNum: { type: integer }
+                pageSize: { type: integer }
+    PageCategory:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                records: { type: array, items: { $ref: '#/components/schemas/Category' } }
+                total: { type: integer, format: int64 }
+                pageNum: { type: integer }
+                pageSize: { type: integer }
+    CreateWorkerRequest:
+      type: object
+      required: [username, password, realName]
+      properties:
+        username: { type: string, maxLength: 50 }
+        password: { type: string, format: password, minLength: 8 }
+        realName: { type: string, maxLength: 50 }
+        phone: { type: string, maxLength: 20 }
+    StatisticsOverviewResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                totalOrders: { type: integer, format: int64 }
+                statusCounts: { type: object, additionalProperties: { type: integer, format: int64 } }
+    CategoryStatisticsResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                type: object
+                properties:
+                  categoryId: { type: integer, format: int64 }
+                  categoryName: { type: string }
+                  actualQuantity: { type: integer, format: int64 }
+    WeightStatisticsResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                totalWeight: { type: number, format: double }
+                weightUnit: { type: string, example: kg }
+  responses:
+    BadRequest:
+      description: 请求参数无效
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Unauthorized:
+      description: 未认证或登录凭证无效
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Forbidden:
+      description: 无权执行该操作
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Conflict:
+      description: 资源冲突，例如账号重复
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    InvalidState:
+      description: 当前订单状态不允许该操作
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
